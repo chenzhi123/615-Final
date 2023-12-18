@@ -1,0 +1,12 @@
+name: Bahrain
+title: Bahrain
+username: bahrain
+account: bahrain
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 10821220
+bundleId: 8062436
+url: https://bahrain.shinyapps.io/Bahrain/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
