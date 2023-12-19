@@ -5,8 +5,9 @@ account: bahrain
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 10821220
-bundleId: 8062436
+bundleId: 8064044
 url: https://bahrain.shinyapps.io/Bahrain/
 version: 1
 asMultiple: FALSE
 asStatic: FALSE
+ignoredFiles: API_CYP_DS2_en_csv_v2_6260326.csv|API_MDV_DS2_en_csv_v2_6234107.csv|www/1.jpeg

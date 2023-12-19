@@ -16,20 +16,24 @@ library(readr)
 library(reshape2)
 library(maps)
 library(leaflet)
+library(shinyjs)
 
-# 定义用户界面
+
+
 ui <- fluidPage(
   titlePanel("Bahrain Analysis"),
   
-  # 创建一个选择输入，用于选择要显示的部分
+
+
   selectInput("section", "Choose a Section:", 
               choices = c("General Description", "Key Demographics", 
-                          "Comparison with Other Island Nations", "SWOT Analysis")),
+                          "Comparison with Other Island Nations", "SWOT Analysis", "Bahrain Views")),
   
-  # 用于选择General Description部分内容的单选框
+  
+
   uiOutput("content_selector"),
   
-  # 主体面板用于显示所选部分的内容
+
   mainPanel(
     uiOutput("selected_section")
     ,
@@ -41,7 +45,12 @@ ui <- fluidPage(
      # Plot for the comparison section
    ,uiOutput("comparison_explanation") # Text explanation for the comparison plot
    
-   #,uiOutput("swot_analysis")
+   ,uiOutput("swot_analysis")
+   
+   ,uiOutput("image_display") # UI output for the images
+   ,actionButton("prev_img", "Previous", style = "margin-right: 10px;")  # Button to go to the previous image
+   ,actionButton("next_img", "Next")     # Button to go to the next image
+   ,hidden(div(id = "image_holder"))       # Hidden div to store the current image
   )
 )
 
@@ -78,13 +87,48 @@ server <- function(input, output, session) {
     }
   })
   
+  # Reactive value to store the current image index, start with the first image
+  current_image_index <- reactiveVal(1)
+  
+  # Observe clicking on "Previous" button
+  observeEvent(input$prev_img, {
+    current_image_index(max(1, current_image_index() - 1))  # Decrease index but not below 1
+  })
+  
+  # Observe clicking on "Next" button
+  observeEvent(input$next_img, {
+    current_image_index(min(2, current_image_index() + 1))  # Increase index but not above the number of images
+  })
+  
+  # Output for displaying images
+  output$image_display <- renderUI({
+    if(input$section == "Bahrain Views") {
+      if(current_image_index() == 1) {
+        img(src = "1.jpg", height = "1500px")  
+      } else {
+        img(src = "2.jpg", height = "1500px")  
+      }
+    }
+  })
+  
+  # Show/Hide navigation buttons based on the selected section
+  observe({
+    if(input$section == "Bahrain Views") {
+      shinyjs::show("prev_img")
+      shinyjs::show("next_img")
+    } else {
+      shinyjs::hide("prev_img")
+      shinyjs::hide("next_img")
+    }
+  })
+  
   # Render content based on section and selection
   output$selected_section <- renderUI({
     if(input$section == "General Description") {
       switch(input$content,
              world_map = plotOutput("world_map_plot"),
              island_map = leafletOutput("bahrain_map"),
-             key_facts = verbatimTextOutput("key_facts_output"),
+             key_facts = tableOutput("key_facts_output"),
              narrative_description = verbatimTextOutput("narrative_description_output"))
     } else if(input$section == "Key Demographics") {
       switch(input$demographics_content,
@@ -147,44 +191,26 @@ server <- function(input, output, session) {
       addTiles() %>%
       addMarkers(lng = 50.5833, lat = 26.2167, popup = "Manama, Bahrain") })
   
-  output$key_facts_output <- renderText({  
-    HTML("
-Geography and History:
-
-Bahrain is a small Arab state in the Persian Gulf, 
-consisting of Bahrain Island and about 30 smaller islands.
-Historically, Bahrain has been an important trading center, 
-believed to be the site of the ancient Dilmun kingdom, 
-and has been ruled by the Khalīfah family since the late 18th century.
-
-Land and Climate:
-
-The total land area of Bahrain is slightly greater than Singapore, 
-extending about 30 miles from north to south and 10 miles from east to west.
-The climate features hot and humid summers, 
-with cooler, more pleasant winters. 
-Rainfall is limited, mostly confined to the winter months.
-
-Natural Resources and Economy:
-
-Despite being in a prime oil-producing region, 
-Bahrain has only small petroleum reserves and primarily processes crude oil from neighboring countries. 
-The financial, commercial services, communications sectors, and tourism have grown significantly.
-
-Flora and Fauna:
-
-The country supports a variety of desert plants, 
-fruit trees, and vegetable gardens, 
-with limited animal life adapted to desert conditions.
-
-Demographics and Culture:
-
-Roughly half of Bahrain's population is Arab, 
-with a significant proportion of foreign-born residents from 
-Iran, India, Pakistan, Britain, and the United States.
-Arabic is the official language, 
-with English widely used as a compulsory second language in schools.")
-    })
+  # Structure the data into a dataframe
+  key_facts_data <- data.frame(
+    Category = c("Geography and History", "Land and Climate", "Natural Resources and Economy", "Flora and Fauna", "Demographics and Culture"),
+    Description = c(
+      "Bahrain is a small Arab state in the Persian Gulf, consisting of Bahrain Island and about 30 smaller islands. Historically, Bahrain has been an important trading center, believed to be the site of the ancient Dilmun kingdom, and has been ruled by the Khalīfah family since the late 18th century.",
+      "The total land area of Bahrain is slightly greater than Singapore, extending about 30 miles from north to south and 10 miles from east to west. The climate features hot and humid summers, with cooler, more pleasant winters. Rainfall is limited, mostly confined to the winter months.",
+      "Despite being in a prime oil-producing region, Bahrain has only small petroleum reserves and primarily processes crude oil from neighboring countries. The financial, commercial services, communications sectors, and tourism have grown significantly.",
+      "The country supports a variety of desert plants, fruit trees, and vegetable gardens, with limited animal life adapted to desert conditions.",
+      "Roughly half of Bahrain's population is Arab, with a significant proportion of foreign-born residents from Iran, India, Pakistan, Britain, and the United States. Arabic is the official language, with English widely used as a compulsory second language in schools."
+    )
+  )
+  
+  # Adjust the server function
+  output$key_facts_output <- renderTable({
+    # Return the key_facts_data dataframe
+    key_facts_data
+  }, align = 'l', sanitize.text.function = function(x) x)  # Use 'l' for left alignment of text
+  
+  
+  
   output$narrative_description_output <- renderText({ 
     HTML("Bahrain, an island nation in the Persian Gulf, 
          is known for its rich cultural history and modern economic prowess. 
@@ -204,6 +230,22 @@ with English widely used as a compulsory second language in schools.")
          adds to its rich cultural landscape, 
          making it a unique blend of tradition and modernity.")
     })
+
+  
+  # Render the image in the 'Key facts about the island state' section
+  output$key_facts_image <- renderUI({
+    if(input$section == "General Description" && input$content == "key_facts") {
+      tags$img(src = "1.jpg", height = "1000px", width = "auto")
+    }
+  })
+  
+  # Render the image in the 'A brief narrative description of the island state' section
+  output$narrative_description_image <- renderUI({
+    if(input$section == "General Description" && input$content == "narrative_description") {
+      tags$img(src = "1.jpeg", height = "1000px", width = "auto")
+    }
+  })
+  
   
   # Key Demographics plots
   output$pop_urb_gdp_plot <- renderPlot({
@@ -379,30 +421,76 @@ with English widely used as a compulsory second language in schools.")
     }
   })
   
-  # Text explanation for the comparison plot
+  # # Text explanation for the comparison plot
+  # output$comparison_explanation <- renderUI({
+  #   if(input$section == "Comparison with Other Island Nations") {
+  #     HTML("
+  #     <ul>
+  #       <li><strong>Education Scores:</strong> The first graph compares education scores among the three countries. Bahrain appears to have a lower score than Cyprus but higher than the Maldives, suggesting Bahrain falls in the middle in terms of this particular education quality or achievement metric.</li>
+  #       
+  #       <li><strong>Emissions per Capita:</strong> In the second graph, Bahrain's emissions per capita are the highest among the three, with Cyprus and the Maldives having significantly lower figures. This could be indicative of Bahrain's industrial activities, energy consumption, and reliance on fossil fuels.</li>
+  #       
+  #       <li><strong>GDP PPP (Purchasing Power Parity):</strong> The third graph shows the GDP at purchasing power parity, where Bahrain has a lower value than Cyprus but is ahead of the Maldives. GDP PPP is a measure that accounts for the relative cost of living and inflation rates between countries, suggesting that Bahrain's economy, when adjusted for these factors, is smaller than Cyprus’s but larger than the Maldives’s.</li>
+  #       
+  #       <li><strong>Gov Expenditure per Student:</strong> The fourth graph indicates government expenditure per student, with Bahrain spending less than Cyprus but more than the Maldives. This reflects the financial resources allocated by the government towards each student's education.</li>
+  #       
+  #       <li><strong>Health Expenditure Per Capita:</strong> The fifth graph compares health expenditure per capita. Here, Bahrain is again in the middle, spending more than the Maldives but less than Cyprus. This measure reflects the amount of financial resources provided for health services per person.</li>
+  #       
+  #       <li><strong>Private Health Expenditure %:</strong> The last graph shows private health expenditure as a percentage of the total health expenditure. Bahrain has the highest percentage among the three, indicating a larger role for private spending in healthcare compared to Cyprus and the Maldives.</li>
+  #       
+  #       <li><strong>In summary:</strong> the charts suggest that Bahrain has relatively high emissions per capita and a significant private sector role in health expenditure compared to Cyprus and the Maldives. It occupies a middle position in terms of education scores, GDP PPP, government expenditure on education, and health expenditure per capita.</li>
+  #     </ul>
+  #   ")
+  #   }
+  # })
+  
   output$comparison_explanation <- renderUI({
     if(input$section == "Comparison with Other Island Nations") {
-      HTML("
-      <ul>
-        <li><strong>Education Scores:</strong> The first graph compares education scores among the three countries. Bahrain appears to have a lower score than Cyprus but higher than the Maldives, suggesting Bahrain falls in the middle in terms of this particular education quality or achievement metric.</li>
-        
-        <li><strong>Emissions per Capita:</strong> In the second graph, Bahrain's emissions per capita are the highest among the three, with Cyprus and the Maldives having significantly lower figures. This could be indicative of Bahrain's industrial activities, energy consumption, and reliance on fossil fuels.</li>
-        
-        <li><strong>GDP PPP (Purchasing Power Parity):</strong> The third graph shows the GDP at purchasing power parity, where Bahrain has a lower value than Cyprus but is ahead of the Maldives. GDP PPP is a measure that accounts for the relative cost of living and inflation rates between countries, suggesting that Bahrain's economy, when adjusted for these factors, is smaller than Cyprus’s but larger than the Maldives’s.</li>
-        
-        <li><strong>Gov Expenditure per Student:</strong> The fourth graph indicates government expenditure per student, with Bahrain spending less than Cyprus but more than the Maldives. This reflects the financial resources allocated by the government towards each student's education.</li>
-        
-        <li><strong>Health Expenditure Per Capita:</strong> The fifth graph compares health expenditure per capita. Here, Bahrain is again in the middle, spending more than the Maldives but less than Cyprus. This measure reflects the amount of financial resources provided for health services per person.</li>
-        
-        <li><strong>Private Health Expenditure %:</strong> The last graph shows private health expenditure as a percentage of the total health expenditure. Bahrain has the highest percentage among the three, indicating a larger role for private spending in healthcare compared to Cyprus and the Maldives.</li>
-        
-        <li><strong>In summary:</strong> the charts suggest that Bahrain has relatively high emissions per capita and a significant private sector role in health expenditure compared to Cyprus and the Maldives. It occupies a middle position in terms of education scores, GDP PPP, government expenditure on education, and health expenditure per capita.</li>
-      </ul>
-    ")
+      tabsetPanel(
+        tabPanel("Education Scores", HTML("<li><strong>Education Scores:</strong> The first graph compares education scores among the three countries. Bahrain appears to have a lower score than Cyprus but higher than the Maldives, suggesting Bahrain falls in the middle in terms of this particular education quality or achievement metric.</li>")),
+        tabPanel("Emissions per Capita", HTML("<li><strong>Emissions per Capita:</strong> In the second graph, Bahrain's emissions per capita are the highest among the three, with Cyprus and the Maldives having significantly lower figures. This could be indicative of Bahrain's industrial activities, energy consumption, and reliance on fossil fuels.</li>")),
+        tabPanel("GDP PPP", HTML("<li><strong>GDP PPP (Purchasing Power Parity):</strong> The third graph shows the GDP at purchasing power parity, where Bahrain has a lower value than Cyprus but is ahead of the Maldives. GDP PPP is a measure that accounts for the relative cost of living and inflation rates between countries, suggesting that Bahrain's economy, when adjusted for these factors, is smaller than Cyprus’s but larger than the Maldives’s.</li>")),
+        tabPanel("Gov Expenditure per Student", HTML("<li><strong>Gov Expenditure per Student:</strong> The fourth graph indicates government expenditure per student, with Bahrain spending less than Cyprus but more than the Maldives. This reflects the financial resources allocated by the government towards each student's education.</li>")),
+        tabPanel("Health Expenditure Per Capita", HTML("<li><strong>Health Expenditure Per Capita:</strong> The fifth graph compares health expenditure per capita. Here, Bahrain is again in the middle, spending more than the Maldives but less than Cyprus. This measure reflects the amount of financial resources provided for health services per person.</li>")),
+        tabPanel("Private Health Expenditure %", HTML("<li><strong>Private Health Expenditure %:</strong> The last graph shows private health expenditure as a percentage of the total health expenditure. Bahrain has the highest percentage among the three, indicating a larger role for private spending in healthcare compared to Cyprus and the Maldives.</li>")),
+        tabPanel("Summary", HTML("<li><strong>In summary:</strong> the charts suggest that Bahrain has relatively high emissions per capita and a significant private sector role in health expenditure compared to Cyprus and the Maldives. It occupies a middle position in terms of education scores, GDP PPP, government expenditure on education, and health expenditure per capita.</li>"))
+      )
     }
   })
-  
-  
+  # Render the SWOT Analysis content
+  output$swot_analysis <- renderUI({
+    if(input$section == "SWOT Analysis") {
+      tabsetPanel(
+        tabPanel("Strengths", HTML(paste0("<ol>",
+                                          "<li><strong>Economic Growth:</strong> Bahrain shows a consistent upward trend in GDP and GDP per capita, indicating robust economic growth and improvement in the standard of living.</li>",
+                                          "<li><strong>Urbanization:</strong> A high and increasing urban population percentage suggests a potential for economic diversification and the development of urban infrastructure.</li>",
+                                          "<li><strong>Education Commitment:</strong> Despite fluctuations, high enrollment rates in primary and secondary education indicate a strong commitment to education.</li>",
+                                          "<li><strong>Healthcare Spending:</strong> Moderate health expenditure per capita shows investment in the healthcare sector, with a significant role for private spending, suggesting a strong private healthcare industry.</li>",
+                                          "</ol>"
+        ))),
+        tabPanel("Weaknesses", HTML(paste0("<ol>",
+                                           "<li><strong>Economic Volatility:</strong> The GDP growth rate shows volatility, reflecting susceptibility to external economic shocks, likely due to reliance on oil exports.</li>",
+                                           "<li><strong>Educational Scores:</strong> Lower educational scores compared to similar nations may indicate room for improvement in the quality of education.</li>",
+                                           "<li><strong>Environmental Impact:</strong> High emissions per capita demonstrate environmental challenges associated with industrial and energy sectors.</li>",
+                                           "</ol>"
+        ))),
+        tabPanel("Opportunities", HTML(paste0("<ol>",
+                                              "<li><strong>Diversification:</strong> With a growing urban population, there is an opportunity to diversify the economy beyond oil into sectors such as finance, tourism, and information technology.</li>",
+                                              "<li><strong>Educational Improvement:</strong> By investing in education quality and infrastructure, Bahrain can enhance its human capital to compete on a global scale.</li>",
+                                              "<li><strong>Healthcare Development:</strong> The existing private healthcare expenditure indicates a potential market for healthcare services and medical tourism.</li>",
+                                              "</ol>"
+        ))),
+        tabPanel("Threats", HTML(paste0("<ol>",
+                                        "<li><strong>Economic Dependency:</strong> Bahrain's economy is vulnerable to fluctuations in the global oil market, which poses a risk to economic stability.</li>",
+                                        "<li><strong>Environmental Sustainability:</strong> The high rate of emissions per capita suggests sustainability issues that could lead to long-term environmental and health problems.</li>",
+                                        "<li><strong>Regional Instability:</strong> Being in a geopolitically sensitive region, Bahrain could be affected by regional tensions and conflicts that might impact its economic and social stability.</li>",
+                                        "</ol>"
+        ))),
+        tabPanel("Summary", HTML(paste0("<p>In conclusion, Bahrain possesses a strong economic foundation and is making substantial investments in urbanization and healthcare. However, it faces challenges in terms of economic diversification, educational improvements, and environmental impact. The country has the opportunity to leverage its strengths to mitigate these challenges and capitalize on new avenues for growth, particularly in the non-oil sectors. The regional political climate remains a significant external factor that Bahrain will need to navigate carefully.</p>"
+        )))
+      )
+    }
+  })
   
   # # Render SWOT Analysis text
   # output$swot_analysis <- renderUI({
