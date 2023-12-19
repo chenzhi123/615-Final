@@ -22,7 +22,12 @@ library(shinyjs)
 
 ui <- fluidPage(
   titlePanel("Bahrain Analysis"),
-  
+  # Add my name and Github link
+  div(style = "margin-bottom: 20px;",    # Add some space below the author line
+      h4("Author: Zengqi Chen. All the code can be accessed through my ",
+         a("Github Repository", href = "https://github.com/chenzhi123/615-Final", target = "_blank")
+      )
+  ),
 
 
   selectInput("section", "Choose a Section:", 
